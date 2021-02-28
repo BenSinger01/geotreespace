@@ -12,17 +12,25 @@
 #' @import treeio
 #'
 #'
-mrcaVec <- function(tree,mrca_matrix=NULL){
+mrcaVec <- function(tree,coord_name="Location",continuous=FALSE,mrca_matrix=NULL){
   if (is.null(mrca_matrix)){
     mrca_matrix <-  linearMrca(tree@phylo)
   }
   mrca_vector <-  mrca_matrix[lower.tri(mrca_matrix)]
-  mrca_location_vector <- character(length(mrca_vector))
-  for(i in 1:length(mrca_vector)){
-    mrca_location_vector[i] <-  tryCatch(toString(tree@data[tree@data$node==mrca_vector[i],"Location"]),
-                                         warning = function(c) {return(toString(tree@data[tree@data$node==mrca_vector[i],"location"]))})
+  if (continuous){
+    mrca_location_vector <- array(numeric(2*length(mrca_vector)),dim=c(length(mrca_vector),2))
+    for(i in 1:length(mrca_vector)){
+      mrca_location_vector[i,1] <-  tree@data[tree@data$node==mrca_vector[i],paste(coord_name,"1",sep='')][[1]]
+      mrca_location_vector[i,2] <-  tree@data[tree@data$node==mrca_vector[i],paste(coord_name,"2",sep='')][[1]]
+    }
+    rownames(mrca_location_vector) <- mrca_vector
+  } else {
+    mrca_location_vector <- character(length(mrca_vector))
+    for(i in 1:length(mrca_vector)){
+      mrca_location_vector[i] <-  toString(tree@data[tree@data$node==mrca_vector[i],coord_name][[1]])
+      names(mrca_location_vector) <- mrca_vector
+    }
   }
-  names(mrca_location_vector) <- mrca_vector
   return(mrca_location_vector)
 }
 
@@ -46,36 +54,40 @@ mrcaVec <- function(tree,mrca_matrix=NULL){
 #' 
 #'
 #' @export
-mrcaDist <- function(tree.a, tree.b, distance.matrix = NULL, normalization = TRUE) {
+mrcaDist <- function(tree.a, tree.b, coord_name="Location", continuous=FALSE, distance.matrix = NULL, normalization = TRUE) {
   # check that the vectors are of the same class
-  if(class(tree.a) != class(tree.b)){
+  if(any(class(tree.a) != class(tree.b))){
     stop("Inputs are of different classes")
   } else if(inherits(tree.a,"treedata")) {
     if(length(tree.a@phylo$tip.label) != length(tree.b@phylo$tip.label)) stop("Trees must have the same number of tips")
     if(setequal(tree.a@phylo$tip.label,tree.b@phylo$tip.label) == FALSE) stop("Trees must have the same tip label sets")
-    v1 <- mrcaVec(tree.a)
-    v2 <- mrcaVec(tree.b)
+    v1 <- mrcaVec(tree.a,coord_name = coord_name,continuous = continuous)
+    v2 <- mrcaVec(tree.b,coord_name = coord_name,continuous = continuous)
   } else {
     v1 <- tree.a
     v2 <- tree.b
   }
-  if (is.null(distance.matrix)){
-    locs <- unique(c(v1,v2))
-    distance.matrix <- 1-diag(length(locs))
-    rownames(distance.matrix) <- locs
-    colnames(distance.matrix) <- locs
-  }
+  I <- 0
   if(inherits(v1,"character")) {
-    I <- 0
+    if (is.null(distance.matrix)){
+      locs <- unique(c(v1,v2))
+      distance.matrix <- 1-diag(length(locs))
+      rownames(distance.matrix) <- locs
+      colnames(distance.matrix) <- locs
+    }
     for (i in 1:length(v1)){
       I <- I + distance.matrix[v1[i],v2[i]]
     }
-    if (normalization) {I = I/(choose(((1+sqrt(1+8*length(v1)))/2),2))}
-    return(I)
+  } else if (inherits(v1,"array")){
+    for (i in 1:length(v1[,1])){
+      I <- I + dist(rbind(v1[i,],v2[i,]))
+    }
   } else {
     # return an error message if the inputs are the wrong type
     stop("Inputs are not of the class treedata or character")
   }
+  if (normalization) {I = I/(choose(((1+sqrt(1+8*length(v1)))/2),2))}
+  return(I)
 }
 
 
@@ -99,8 +111,8 @@ mrcaDist <- function(tree.a, tree.b, distance.matrix = NULL, normalization = TRU
 #' 
 #'
 #' @export
-multiMrcaDist <- function(trees, distance.matrix=NULL, normalization=TRUE, save.memory=FALSE){
-  if(!inherits(trees, "multiPhylo")) stop("trees should be a multiphylo object")
+multiMrcaDist <- function(trees, coord_name="Location", continuous=FALSE, distance.matrix=NULL, normalization=TRUE, save.memory=FALSE){
+  if(!inherits(trees, "multiPhylo")) stop("trees should be a multiPhylo object")
   num_trees <- length(trees) 
   if(num_trees<2) {
     stop("multiMrcaDist expects at least two trees")
@@ -123,14 +135,18 @@ multiMrcaDist <- function(trees, distance.matrix=NULL, normalization=TRUE, save.
   
   # Here we speed up the computation by storing all vectors
   if(!save.memory){
-    mrca_vectors <- sapply(1:num_trees,function(i){mrcaVec(trees[[i]])})
+    mrca_vectors <- sapply(1:num_trees,function(i){mrcaVec(trees[[i]],coord_name,continuous)})
     
     mrca_indices_repeating <- unlist(sapply(1:(num_trees-1),function(i){replicate(num_trees-i,i)}))
     
     mrca_indices_cycling <- unlist(sapply(2:num_trees, function(i){i:num_trees}))
     
-    distances_upper_tri <- mapply(function(i,j){mrcaDist(mrca_vectors[,i],mrca_vectors[,j],distance.matrix=distance.matrix)},mrca_indices_repeating,mrca_indices_cycling)
-    
+    if(continuous){
+      n = length(mrca_vectors)/(num_trees*2)
+      distances_upper_tri <- mapply(function(i,j){mrcaDist(array(mrca_vectors[,i],dim=c(n,2)),array(mrca_vectors[,j],dim=c(n,2)),distance.matrix=distance.matrix)},mrca_indices_repeating,mrca_indices_cycling)
+    } else {
+      distances_upper_tri <- mapply(function(i,j){mrcaDist(mrca_vectors[,i],mrca_vectors[,j],distance.matrix=distance.matrix)},mrca_indices_repeating,mrca_indices_cycling)
+    }
     distances <- matrix(0.0,num_trees,num_trees)
     distances[upper.tri(distances)] <- distances_upper_tri
     distances <- distances+t(distances)
@@ -142,7 +158,7 @@ multiMrcaDist <- function(trees, distance.matrix=NULL, normalization=TRUE, save.
     
     sapply(1:(num_trees-1),function(i) {
       sapply((i+1):num_trees, function(j) {
-        distances[i,j] <<- distances[j,i] <<- mrcaDist(trees[[i]],trees[[j]],distance.matrix,normalization)
+        distances[i,j] <<- distances[j,i] <<- mrcaDist(trees[[i]],trees[[j]],coord_name,continuous,distance.matrix,normalization)
       })
     })
   }
