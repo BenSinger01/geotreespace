@@ -24,7 +24,7 @@ myoffspring<-function(myphylo,mynode){unlist(offspring(as_tibble(myphylo),mynode
 #' 
 #'
 #' @export
-maspgDist <- function(tree.a,tree.b,geography=TRUE){
+maspgDist <- function(tree.a,tree.b,coord_name="Location",discretization=FALSE,geography=TRUE){
   #Vector of node numbering
   NNODES<-tree.a@phylo$Nnode*2+1
   nodes1 <- as.numeric(unlist(tree.a@data$node))
@@ -33,8 +33,17 @@ maspgDist <- function(tree.a,tree.b,geography=TRUE){
   tips1 <- tree.a@phylo$tip.label
   tips2 <- tree.b@phylo$tip.label
   #Vector of locations
-  locs1 <- tryCatch(unlist(tree.a@data$Location), warning = function(c) {return(unlist(tree.a@data$location))})
-  locs2 <- tryCatch(unlist(tree.b@data$Location), warning = function(c) {return(unlist(tree.b@data$location))})
+  if (!discretization){
+    locs1 <- unlist(tree.a@data[coord_name])
+    locs2 <- unlist(tree.b@data[coord_name])
+  } else {
+    locs1x <- unlist(tree.a@data[paste(coord_name,"1",sep='')])
+    locs1y <- unlist(tree.a@data[paste(coord_name,"2",sep='')])
+    locs2x <- unlist(tree.a@data[paste(coord_name,"1",sep='')])
+    locs2y <- unlist(tree.a@data[paste(coord_name,"2",sep='')])
+    locs1 <- array(c(locs1x,locs1y),dim=c(length(locs1x),2))
+    locs2 <- array(c(locs2x,locs2y),dim=c(length(locs2x),2))
+  }
   #Find roots
   root1 <- as.vector(unlist(rootnode(as_tibble(tree.a@phylo))[,2]))
   root2 <- as.vector(unlist(rootnode(as_tibble(tree.a@phylo))[,2]))
@@ -59,47 +68,86 @@ maspgDist <- function(tree.a,tree.b,geography=TRUE){
   #Perform the calculations! The way the array of comparisons to make is set up,
   #everything should be calculated in the required order just by going through
   #the array in order
-  for (i in 1:(NNODES^2)){
-    node1 <- nodes1[ceiling(i/NNODES)]
-    node2 <- nodes2[z[i%%NNODES+1]]
-    if((node1<=NTIPS)&(node2<=NTIPS)){
-      next
-    }
-    else if (node1<=NTIPS){
-      score.matrix[nodes1==node1,nodes2==node2] <- 
-        ((nodes1[nodes1<=NTIPS])[tips2==tips1[(nodes1[nodes1<=NTIPS])==node1]] 
-         %in% myoffspring(tree.b@phylo,node2))
-    }
-    else if (node2<=NTIPS){
-      score.matrix[nodes1==node1,nodes2==node2] <- 
-        ((nodes2[nodes2<=NTIPS])[tips1==tips2[(nodes2[nodes2<=NTIPS])==node2]] 
-         %in% myoffspring(tree.a@phylo,node1))
-    }
-    else if ((locs1[nodes1==node1]!=locs2[nodes2==node2])&geography){
-      score.matrix[nodes1==node1,nodes2==node2] <-
-        max(score.matrix[nodes1==node1,nodes2==mychild(tree.b@phylo,node2)[1]],
-            score.matrix[nodes1==node1,nodes2==mychild(tree.b@phylo,node2)[2]],
-            score.matrix[nodes1==mychild(tree.a@phylo,node1)[1],nodes2==node2],
-            score.matrix[nodes1==mychild(tree.a@phylo,node1)[2],nodes2==node2])
-      if (is.na(score.matrix[nodes1==node1,nodes2==node2])){
-        warning("Non-numerical entry in the score matrix")
+  if (!discretization){
+    for (i in 1:(NNODES^2)){
+      node1 <- nodes1[ceiling(i/NNODES)]
+      node2 <- nodes2[z[i%%NNODES+1]]
+      if((node1<=NTIPS)&(node2<=NTIPS)){
+        next
+      } else if (node1<=NTIPS){
+        score.matrix[nodes1==node1,nodes2==node2] <- 
+          ((nodes1[nodes1<=NTIPS])[tips2==tips1[(nodes1[nodes1<=NTIPS])==node1]] 
+           %in% myoffspring(tree.b@phylo,node2))
+      } else if (node2<=NTIPS){
+        score.matrix[nodes1==node1,nodes2==node2] <- 
+          ((nodes2[nodes2<=NTIPS])[tips1==tips2[(nodes2[nodes2<=NTIPS])==node2]] 
+           %in% myoffspring(tree.a@phylo,node1))
+      } else if ((locs1[nodes1==node1]!=locs2[nodes2==node2])&geography){
+        score.matrix[nodes1==node1,nodes2==node2] <-
+          max(score.matrix[nodes1==node1,nodes2==mychild(tree.b@phylo,node2)[1]],
+              score.matrix[nodes1==node1,nodes2==mychild(tree.b@phylo,node2)[2]],
+              score.matrix[nodes1==mychild(tree.a@phylo,node1)[1],nodes2==node2],
+              score.matrix[nodes1==mychild(tree.a@phylo,node1)[2],nodes2==node2])
+        if (is.na(score.matrix[nodes1==node1,nodes2==node2])){
+          warning("Non-numerical entry in the score matrix")
+        }
+      } else {
+        mychild.score1 <- score.matrix[nodes1==mychild(tree.a@phylo,node1)[1],
+                                     nodes2==mychild(tree.b@phylo,node2)[2]] +
+          score.matrix[nodes1==mychild(tree.a@phylo,node1)[2],
+                       nodes2==mychild(tree.b@phylo,node2)[1]]
+        mychild.score2 <- score.matrix[nodes1==mychild(tree.a@phylo,node1)[1],
+                                     nodes2==mychild(tree.b@phylo,node2)[1]] +
+          score.matrix[nodes1==mychild(tree.a@phylo,node1)[2],
+                       nodes2==mychild(tree.b@phylo,node2)[2]]
+        score.matrix[nodes1==node1,nodes2==node2] <- 
+          max(mychild.score1,mychild.score2,
+              score.matrix[nodes1==node1,nodes2==mychild(tree.b@phylo,node2)[1]],
+              score.matrix[nodes1==node1,nodes2==mychild(tree.b@phylo,node2)[2]],
+              score.matrix[nodes1==mychild(tree.a@phylo,node1)[1],nodes2==node2],
+              score.matrix[nodes1==mychild(tree.a@phylo,node1)[2],nodes2==node2])
       }
     }
-    else {
-      mychild.score1 <- score.matrix[nodes1==mychild(tree.a@phylo,node1)[1],
-                                   nodes2==mychild(tree.b@phylo,node2)[2]] +
-        score.matrix[nodes1==mychild(tree.a@phylo,node1)[2],
-                     nodes2==mychild(tree.b@phylo,node2)[1]]
-      mychild.score2 <- score.matrix[nodes1==mychild(tree.a@phylo,node1)[1],
-                                   nodes2==mychild(tree.b@phylo,node2)[1]] +
-        score.matrix[nodes1==mychild(tree.a@phylo,node1)[2],
-                     nodes2==mychild(tree.b@phylo,node2)[2]]
-      score.matrix[nodes1==node1,nodes2==node2] <- 
-        max(mychild.score1,mychild.score2,
-            score.matrix[nodes1==node1,nodes2==mychild(tree.b@phylo,node2)[1]],
-            score.matrix[nodes1==node1,nodes2==mychild(tree.b@phylo,node2)[2]],
-            score.matrix[nodes1==mychild(tree.a@phylo,node1)[1],nodes2==node2],
-            score.matrix[nodes1==mychild(tree.a@phylo,node1)[2],nodes2==node2])
+  } else {
+    for (i in 1:(NNODES^2)){
+      node1 <- nodes1[ceiling(i/NNODES)]
+      node2 <- nodes2[z[i%%NNODES+1]]
+      if((node1<=NTIPS)&(node2<=NTIPS)){
+        next
+      } else if (node1<=NTIPS){
+        score.matrix[nodes1==node1,nodes2==node2] <- 
+          ((nodes1[nodes1<=NTIPS])[tips2==tips1[(nodes1[nodes1<=NTIPS])==node1]] 
+           %in% myoffspring(tree.b@phylo,node2))
+      } else if (node2<=NTIPS){
+        score.matrix[nodes1==node1,nodes2==node2] <- 
+          ((nodes2[nodes2<=NTIPS])[tips1==tips2[(nodes2[nodes2<=NTIPS])==node2]] 
+           %in% myoffspring(tree.a@phylo,node1))
+      } else if ((dist(rbind(locs1[nodes1==node1,],locs2[nodes2==node2,]))>discretization)
+                 &geography){
+        score.matrix[nodes1==node1,nodes2==node2] <-
+          max(score.matrix[nodes1==node1,nodes2==mychild(tree.b@phylo,node2)[1]],
+              score.matrix[nodes1==node1,nodes2==mychild(tree.b@phylo,node2)[2]],
+              score.matrix[nodes1==mychild(tree.a@phylo,node1)[1],nodes2==node2],
+              score.matrix[nodes1==mychild(tree.a@phylo,node1)[2],nodes2==node2])
+        if (is.na(score.matrix[nodes1==node1,nodes2==node2])){
+          warning("Non-numerical entry in the score matrix")
+        }
+      } else {
+        mychild.score1 <- score.matrix[nodes1==mychild(tree.a@phylo,node1)[1],
+                                       nodes2==mychild(tree.b@phylo,node2)[2]] +
+          score.matrix[nodes1==mychild(tree.a@phylo,node1)[2],
+                       nodes2==mychild(tree.b@phylo,node2)[1]]
+        mychild.score2 <- score.matrix[nodes1==mychild(tree.a@phylo,node1)[1],
+                                       nodes2==mychild(tree.b@phylo,node2)[1]] +
+          score.matrix[nodes1==mychild(tree.a@phylo,node1)[2],
+                       nodes2==mychild(tree.b@phylo,node2)[2]]
+        score.matrix[nodes1==node1,nodes2==node2] <- 
+          max(mychild.score1,mychild.score2,
+              score.matrix[nodes1==node1,nodes2==mychild(tree.b@phylo,node2)[1]],
+              score.matrix[nodes1==node1,nodes2==mychild(tree.b@phylo,node2)[2]],
+              score.matrix[nodes1==mychild(tree.a@phylo,node1)[1],nodes2==node2],
+              score.matrix[nodes1==mychild(tree.a@phylo,node1)[2],nodes2==node2])
+      }
     }
   }
   
@@ -125,7 +173,7 @@ maspgDist <- function(tree.a,tree.b,geography=TRUE){
 #' @import treeio
 
 #' @export
-multiMaspgDist <- function(trees, geography=TRUE){
+multiMaspgDist <- function(trees,coord_name="Location",discretization=FALSE,geography=TRUE){
   if(!inherits(trees, "multiPhylo")) stop("trees should be a multiphylo object")
   num_trees <- length(trees) 
   if(num_trees<2) {
@@ -151,7 +199,7 @@ multiMaspgDist <- function(trees, geography=TRUE){
   
   sapply(1:(num_trees-1),function(i) {
     sapply((i+1):num_trees, function(j) {
-      distances[i,j] <<- distances[j,i] <<- maspgDist(trees[[i]],trees[[j]],geography)
+      distances[i,j] <<- distances[j,i] <<- maspgDist(trees[[i]],trees[[j]],coord_name,discretization,geography)
     })
   })
   
