@@ -16,11 +16,11 @@ myoffspring<-function(myphylo,mynode){unlist(offspring(as_tibble(myphylo),mynode
 #'
 #' @param tree.a an object of the class \code{treedata}
 #' @param tree.b an object of the class \code{treedata} (with the same tip labels as tree.a)
-#' @param geography If false, the MAST metric is computed, instead of the MASPG metric
+#' @param coord_name (optional) a string specifying the name of the column in the tree data containing geographic locations.
+#' @param discretization (optional) I_MASPG is a discrete measure which compares if locations are the same or different, and which does not use geographic distances. To use continuous distances a discretization must be specified. This is a numeric measure of distance under which two points are 'the same'. If discretization is used, 2-dimensional co-ordinates are assumed, with names coord_name1 and coord_name2.
+#' @param geography (optional) If false, the MAST metric is computed, instead of the MASPG metric
 #' 
 #' @return The distance between the two trees according to the metric
-#'
-#' @import treeio
 #' 
 #'
 #' @export
@@ -34,19 +34,22 @@ maspgDist <- function(tree.a,tree.b,coord_name="Location",discretization=FALSE,g
   tips2 <- tree.b@phylo$tip.label
   #Vector of locations
   if (!discretization){
+    if((paste(coord_name,"1",sep='') %in% colnames(tree.a@data))&!(coord_name %in% colnames(tree.a@data))){
+      stop("Continuous spatial co-ordinates require a discretization threshold.")
+    }
     locs1 <- unlist(tree.a@data[coord_name])
     locs2 <- unlist(tree.b@data[coord_name])
   } else {
     locs1x <- unlist(tree.a@data[paste(coord_name,"1",sep='')])
     locs1y <- unlist(tree.a@data[paste(coord_name,"2",sep='')])
-    locs2x <- unlist(tree.a@data[paste(coord_name,"1",sep='')])
-    locs2y <- unlist(tree.a@data[paste(coord_name,"2",sep='')])
+    locs2x <- unlist(tree.b@data[paste(coord_name,"1",sep='')])
+    locs2y <- unlist(tree.b@data[paste(coord_name,"2",sep='')])
     locs1 <- array(c(locs1x,locs1y),dim=c(length(locs1x),2))
     locs2 <- array(c(locs2x,locs2y),dim=c(length(locs2x),2))
   }
   #Find roots
   root1 <- as.vector(unlist(rootnode(as_tibble(tree.a@phylo))[,2]))
-  root2 <- as.vector(unlist(rootnode(as_tibble(tree.a@phylo))[,2]))
+  root2 <- as.vector(unlist(rootnode(as_tibble(tree.b@phylo))[,2]))
   
   #Get number of nodes
   N <- length(unlist(tree.a@data$node))
@@ -66,7 +69,7 @@ maspgDist <- function(tree.a,tree.b,coord_name="Location",discretization=FALSE,g
   z<-c(NNODES,1:(NNODES-1))
   
   #Perform the calculations! The way the array of comparisons to make is set up,
-  #everything should be calculated in the required order just by going through
+  #everything is calculated in the required order just by going through
   #the array in order
   if (!discretization){
     for (i in 1:(NNODES^2)){
@@ -165,13 +168,13 @@ maspgDist <- function(tree.a,tree.b,coord_name="Location",discretization=FALSE,g
 #' @author Luca Ferretti \email{luca.ferretti@@gmail.com}
 #'
 #' @param trees an object of the class \code{multiPhylo} containing the trees to be compared
-#' @param geography If false, the MAST metric is computed, instead of the MASPG metric
+#' @param coord_name (optional) a string specifying the name of the column in the tree data containing geographic locations.
+#' @param discretization (optional) I_MASPG is a discrete measure which compares if locations are the same or different, and which does not use geographic distances. To use continuous distances a discretization must be specified. This is a numeric measure of distance under which two points are 'the same'. If discretization is used, 2-dimensional co-ordinates are assumed, with names coord_name1 and coord_name2.
+#' @param geography (optional) If false, the MAST metric is computed, instead of the MASPG metric
+#' 
+#' @return The pairwise tree incompatibility matrix
 #'
-#' @return The pairwise tree incompatibility matrix or a function that produces the incompatibility matrix
 #'
-#'
-#' @import treeio
-
 #' @export
 multiMaspgDist <- function(trees,coord_name="Location",discretization=FALSE,geography=TRUE){
   if(!inherits(trees, "multiPhylo")) stop("trees should be a multiphylo object")
