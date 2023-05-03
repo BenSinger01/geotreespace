@@ -2,9 +2,9 @@
 # create some test objects
 ############################
 
-tree_a <- read.beast("mtGeo.MCC.txt")
-tree_b <- read.beast("yGeo.MCC.txt")
-tree_c <- read.beast("autoGeo.MCC.txt")
+tree_a <- read.beast(testthat::test_path("examples", "mtGeo.MCC.txt"))
+tree_b <- read.beast(testthat::test_path("examples", "yGeo.MCC.txt"))
+tree_c <- read.beast(testthat::test_path("examples", "autoGeo.MCC.txt"))
 
 trees <- c(tree_a,tree_b,tree_c)
 class(trees) <- "multiPhylo"
