@@ -1,12 +1,12 @@
 # *geotreespace*: an R Package for the Statistical Measure of Phylogeographic Incopatibilities
 
-*geotreespace* implements new mathematical measures of phylogeographic concordance or incompatibilities,:
+*geotreespace* implements new mathematical measures (metrics) of phylogeographic concordance or incompatibilities,:
 the Pairwise Most-Recent Common Ancestor (MRCA) incompatibility $I_{mrca}$ and the Maximum Agreement Sub-Phylogeography (MASPG) $I_{maspg}$.
-These emtrics are aimed at detecting differences between geographical histories in terms of
-distances between phylogeographies. These incompatibility measures can be applied
-to any phylogeography, and more generally to any phylogeny where each tip has been assigned
+These metrics are for detecting differences between geographical histories in terms of
+distances between phylogeographies. The metrics can be applied to any phylogeography, 
+and more generally to any phylogeny where each tip has been assigned
 a geographical discrete location or any other continuous/discrete 'trait' independent of the sequence.
-A non-zero value of an incompatibility measure between two phylogeographies implies that they are incompatible,
+A non-zero value of an incompatibility metric between two phylogeographies implies that they are incompatible,
 and could be evidence of recombination.
 
 
