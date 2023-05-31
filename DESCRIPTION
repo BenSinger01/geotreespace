@@ -1,0 +1,29 @@
+Package: geotreespace
+Type: Package
+Title: GEOTREESPACE - an R Package for the Statistical Measure of Phylogeographic Incopatibilities
+Date: 2023-06-01
+Version: 1.0
+Authors@R: c(BS = person("Benjamin John", "Singer", email = "Benjamin.Singer@ucsf.edu", role = c("aut", "cre", "cph")),
+             ADN = person("Antonello", "Di Nardo", email = "antonello.di-nardo@pirbright.ac.uk", role = c("aut", "cph")),
+             LF = person("Luca", "Ferretti", email = "luca.ferretti@bdi.ox.ac.uk", role = c("aut", "cph")))
+Maintainer: Benjamin John Singer <Benjamin.Singer@ucsf.edu>
+Description: Tools for statistical measure of phylogeographic concordance or incompatibilities,
+             aimed at detecting differences between geographical histories in terms of
+             distances between phylogeographies. These incompatibility measures can be applied
+             to any phylogeography, and more generally to any phylogeny where each tip has been assigned
+             a geographical discrete location or any other continuous/discrete 'trait' independent of the sequence.
+             For further details see Singer et al. (2020) <DOI:10.1101/2020.01.10.902460>
+License: MIT
+Depends:
+    R (>= 4.0)
+Imports:
+    treespace,
+    treeio,
+    tidytree
+Suggests: testthat
+Encoding: UTF-8
+LazyData: true
+ByteCompile: true
+RoxygenNote: 7.2.3
+URL: https://github.com/BenSinger01/geotreespace
+BugReports: https://github.com/BenSinger01/geotreespace/issues
